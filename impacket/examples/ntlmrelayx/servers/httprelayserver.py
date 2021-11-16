@@ -1,17 +1,20 @@
-# SECUREAUTH LABS. Copyright 2018 SecureAuth Corporation. All rights reserved.
+# Impacket - Collection of Python classes for working with network protocols.
 #
-# This software is provided under under a slightly modified version
+# SECUREAUTH LABS. Copyright (C) 2021 SecureAuth Corporation. All rights reserved.
+#
+# This software is provided under a slightly modified version
 # of the Apache Software License. See the accompanying LICENSE file
 # for more information.
 #
-# HTTP Relay Server
+# Description:
+#   HTTP Relay Server
+#
+#   This is the HTTP server which relays the NTLMSSP  messages to other protocols
 #
 # Authors:
-#  Alberto Solino (@agsolino)
-#  Dirk-jan Mollema / Fox-IT (https://www.fox-it.com)
+#   Alberto Solino (@agsolino)
+#   Dirk-jan Mollema / Fox-IT (https://www.fox-it.com)
 #
-# Description:
-#             This is the HTTP server which relays the NTLMSSP  messages to other protocols
 
 import http.server
 import socketserver
@@ -331,6 +334,15 @@ class HTTPRelayServer(Thread):
                     return
 
         def do_GET(self):
+            # Get the body of the request if any
+            # Otherwise, successive requests will not be handled properly
+            if PY2:
+                contentLength = self.headers.getheader("Content-Length")
+            else:
+                contentLength = self.headers.get("Content-Length")
+            if contentLength is not None:
+                body = self.rfile.read(int(contentLength))
+
             messageType = 0
             if self.server.config.mode == 'REDIRECT':
                 self.do_SMBREDIRECT()
@@ -399,7 +411,7 @@ class HTTPRelayServer(Thread):
                         self.authUser))
                     # Only skip to next if the login actually failed, not if it was just anonymous login or a system account
                     # which we don't want
-                    if authenticateMessage['user_name'] != '': # and authenticateMessage['user_name'][-1] != '$':
+                    if authenticateMessage['user_name'] != b'': # and authenticateMessage['user_name'][-1] != '$':
                         self.server.config.target.logTarget(self.target)
                         # No anonymous login, go to next host and avoid triggering a popup
                         self.do_REDIRECT()
@@ -471,7 +483,15 @@ class HTTPRelayServer(Thread):
             return True
 
         def do_ntlm_auth(self,token,authenticateMessage):
-            if authenticateMessage['user_name'] != '' or self.target.hostname == '127.0.0.1':
+            #For some attacks it is important to know the authenticated username, so we store it
+            if authenticateMessage['flags'] & ntlm.NTLMSSP_NEGOTIATE_UNICODE:
+                self.authUser = ('%s/%s' % (authenticateMessage['domain_name'].decode('utf-16le'),
+                                            authenticateMessage['user_name'].decode('utf-16le'))).upper()
+            else:
+                self.authUser = ('%s/%s' % (authenticateMessage['domain_name'].decode('ascii'),
+                                            authenticateMessage['user_name'].decode('ascii'))).upper()
+
+            if authenticateMessage['user_name'] != b'' or self.target.hostname == '127.0.0.1':
                 clientResponse, errorCode = self.client.sendAuth(token)
             else:
                 # Anonymous login, send STATUS_ACCESS_DENIED so we force the client to send his credentials, except
